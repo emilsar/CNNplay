@@ -14,12 +14,12 @@ const LABELS = {
   valAcc: 'val acc',
 }
 
-export default function TrainingChart({ history, keys }) {
+export default function TrainingChart({ history, keys, height = 200 }) {
   if (history.length === 0) {
-    return <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a93a6', fontSize: 12 }}>No data yet — train a model.</div>
+    return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a93a6', fontSize: 12 }}>No data yet — train a model.</div>
   }
   return (
-    <ResponsiveContainer width="100%" height={180}>
+    <ResponsiveContainer width="100%" height={height}>
       <LineChart data={history} margin={{ top: 4, right: 12, bottom: 4, left: -16 }}>
         <CartesianGrid stroke="#2a2f3a" strokeDasharray="3 3" />
         <XAxis dataKey="epoch" stroke="#8a93a6" tick={{ fontSize: 11 }} />

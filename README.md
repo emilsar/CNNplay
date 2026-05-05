@@ -1,16 +1,25 @@
-# React + Vite
+# CNNplay
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Browser-based, interactive playground for designing and training small CNNs on real image data. Inspired by [TensorFlow Playground](https://playground.tensorflow.org/), but with editable convolutional architectures and real images instead of toy 2D points.
 
-Currently, two official plugins are available:
+Live demo: [cvmath.club/CNNplay](https://cvmath.club/CNNplay/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Status
 
-## React Compiler
+**Phase 1 — Classification (current).** Edit a layer stack (Conv2D / pooling / dense / dropout / skip connections), pick hyperparameters, train MNIST in your browser via TensorFlow.js. Loss/accuracy charts and sample predictions update live.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Phase 2 — Segmentation (next).** Same editor, urothelial cytology images with per-pixel masks. Connects to the cvmath.club textbook used by LA Mission College VOC Ed students. Architecture supports it already (ConvT, skip connections, segmentation head); the dataset loader and mask visualization are wired but the data isn't shipped yet.
 
-## Expanding the ESLint configuration
+## Stack
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+React + Vite, TensorFlow.js (WebGL backend), Recharts. No backend — pure static site.
+
+## Develop
+
+```bash
+npm install
+npm run dev      # http://localhost:5173/CNNplay/
+npm run build    # → dist/
+```
+
+See `VIABILITY.md` for the design rationale and competitive landscape.

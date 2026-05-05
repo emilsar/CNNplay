@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import * as tf from '@tensorflow/tfjs'
 import ArchitectureEditor from './components/ArchitectureEditor'
+import ArchitectureDiagram from './components/ArchitectureDiagram'
 import Hyperparameters from './components/Hyperparameters'
-import TrainingChart from './components/TrainingChart'
+import ChartCard from './components/ChartCard'
 import Predictions from './components/Predictions'
-import { defaultArchitecture, defaultHyperparams } from './lib/defaults'
+import { defaultArchitecture, defaultHyperparams, datasets } from './lib/defaults'
 import { buildModel, computeShapes } from './lib/buildModel'
 import { MnistData } from './data/mnist'
 
 function App() {
+  const [datasetId, setDatasetId] = useState('mnist')
+  const dataset = datasets[datasetId]
   const [architecture, setArchitecture] = useState(defaultArchitecture)
   const [hyperparams, setHyperparams] = useState(defaultHyperparams)
   const [data, setData] = useState(null)
@@ -25,9 +28,10 @@ function App() {
     tf.ready().then(() => setBackend(tf.getBackend()))
   }, [])
 
-  const shapes = computeShapes(architecture, [28, 28, 1])
+  const shapes = computeShapes(architecture, dataset.inputShape)
 
   async function loadData() {
+    if (!dataset.available) return
     setDataStatus('loading')
     setStatus('Loading MNIST sprite (~10 MB)...')
     try {
@@ -55,7 +59,7 @@ function App() {
 
     let model
     try {
-      model = buildModel(architecture, [28, 28, 1], 10)
+      model = buildModel(architecture, dataset.inputShape, dataset.numClasses, dataset.mode)
     } catch (e) {
       setStatus('Model build error: ' + e.message)
       setTraining(false)
@@ -77,11 +81,12 @@ function App() {
 
     const TRAIN_SIZE = 5500
     const TEST_SIZE = 1000
+    const [H, W, C] = dataset.inputShape
     const trainData = data.nextTrainBatch(TRAIN_SIZE)
     const testData = data.nextTestBatch(TEST_SIZE)
-    const trainXs = trainData.xs.reshape([TRAIN_SIZE, 28, 28, 1])
+    const trainXs = trainData.xs.reshape([TRAIN_SIZE, H, W, C])
     const trainYs = trainData.labels
-    const testXs = testData.xs.reshape([TEST_SIZE, 28, 28, 1])
+    const testXs = testData.xs.reshape([TEST_SIZE, H, W, C])
     const testYs = testData.labels
 
     setStatus(`Training: ${TRAIN_SIZE} samples, batch ${hyperparams.batchSize}, ${hyperparams.epochs} epochs.`)
@@ -115,16 +120,21 @@ function App() {
         },
       })
 
-      const samples = data.nextTestBatch(20)
-      const sampleXs = samples.xs.reshape([20, 28, 28, 1])
+      const N = 20
+      const samples = data.nextTestBatch(N)
+      const sampleXs = samples.xs.reshape([N, H, W, C])
       const preds = model.predict(sampleXs)
       const predIdx = await preds.argMax(1).data()
       const trueIdx = await samples.labels.argMax(1).data()
       const imageData = await sampleXs.data()
+      const stride = H * W * C
       const cells = []
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < N; i++) {
         cells.push({
-          pixels: imageData.slice(i * 784, (i + 1) * 784),
+          pixels: imageData.slice(i * stride, (i + 1) * stride),
+          h: H,
+          w: W,
+          channels: C,
           predicted: predIdx[i],
           actual: trueIdx[i],
         })
@@ -165,7 +175,7 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>CNNplay</h1>
-        <span className="tag">Phase 1 · Classification</span>
+        <span className="tag">Phase 1 · {dataset.mode}</span>
         <span className="tag">backend: {backend || '...'}</span>
         <div className="spacer" />
         <a href="https://github.com/emilsar/CNNplay" target="_blank" rel="noreferrer">GitHub</a>
@@ -175,8 +185,26 @@ function App() {
         <section>
           <h2>Dataset</h2>
           <div className="hyper-row">
-            <label>MNIST (28×28, 10 classes)</label>
-            <button onClick={loadData} disabled={dataStatus === 'loading' || dataStatus === 'ready'}>
+            <label>Source</label>
+            <select
+              value={datasetId}
+              onChange={(e) => setDatasetId(e.target.value)}
+              disabled={training || dataStatus === 'loading'}
+            >
+              {Object.values(datasets).map((d) => (
+                <option key={d.id} value={d.id} disabled={!d.available}>
+                  {d.label}{!d.available ? ' (soon)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="dataset-desc">{dataset.description}</div>
+          <div className="hyper-row">
+            <label>Load</label>
+            <button
+              onClick={loadData}
+              disabled={!dataset.available || dataStatus === 'loading' || dataStatus === 'ready'}
+            >
               {dataStatus === 'ready' ? 'Loaded' : dataStatus === 'loading' ? 'Loading...' : 'Load'}
             </button>
           </div>
@@ -194,10 +222,6 @@ function App() {
       </aside>
 
       <main className="center-content">
-        <div className="intro">
-          <strong>CNNplay</strong> — design a CNN by editing the layer stack on the left, set hyperparameters on the right, then click <code>Train</code>. Training runs entirely in your browser via TensorFlow.js. This is a <strong>Phase 1 prototype</strong>: classification on MNIST. Phase 2 will add segmentation on Oxford Pets.
-        </div>
-
         <div className="metric-row">
           <div className="metric">
             <div className="label">Epoch</div>
@@ -217,22 +241,33 @@ function App() {
           </div>
         </div>
 
-        <div className="chart-wrap">
-          <h3>Loss</h3>
-          <TrainingChart history={history} keys={['loss', 'valLoss']} />
-        </div>
-        <div className="chart-wrap">
-          <h3>Accuracy</h3>
-          <TrainingChart history={history} keys={['acc', 'valAcc']} />
-        </div>
+        <section className="diagram-section">
+          <h3>Architecture</h3>
+          <ArchitectureDiagram
+            architecture={architecture}
+            shapes={shapes}
+            mode={dataset.mode}
+            numClasses={dataset.numClasses}
+          />
+        </section>
 
-        <div className="chart-wrap">
-          <h3>Sample predictions (after training)</h3>
-          <Predictions cells={predictions} />
-        </div>
+        <section className="predictions-section">
+          <h3>Sample predictions</h3>
+          <Predictions cells={predictions} mode={dataset.mode} />
+        </section>
       </main>
 
       <aside className="panel">
+        <section>
+          <h2>Loss</h2>
+          <ChartCard title="Loss" history={history} keys={['loss', 'valLoss']} />
+        </section>
+
+        <section>
+          <h2>Accuracy</h2>
+          <ChartCard title="Accuracy" history={history} keys={['acc', 'valAcc']} />
+        </section>
+
         <section>
           <h2>Hyperparameters</h2>
           <Hyperparameters

@@ -38,7 +38,7 @@ The gap is real — no existing tool combines editable architecture + live train
 - Per-layer feature map viz (borrow from CNN Explainer's UX)
 
 ### Phase 2 — Segmentation
-- Dataset: [Oxford-IIIT Pets](https://www.robots.ox.ac.uk/~vgg/data/pets/) (already in TF datasets, has trimap masks)
+- Dataset: urothelial cytology cells (binary/multi-class masks from the VocEd corpus — same images the cvmath.club textbook uses for LA Mission College VOC Ed students)
 - U-Net editor: depth, channels per level, pooling vs strided conv, skip connections on/off
 - Live mask overlay during training
 
@@ -63,5 +63,5 @@ The gap is real — no existing tool combines editable architecture + live train
 - [TF.js + WebGPU performance discussion](https://github.com/tensorflow/tfjs/issues/8156)
 - [BodyPix browser segmentation](https://blog.tensorflow.org/2019/11/updated-bodypix-2.html)
 - [Real-time semantic segmentation in browser (RefineNet)](https://github.com/hugozanini/realtime-semantic-segmentation)
-- [Oxford-IIIT Pet Dataset](https://www.robots.ox.ac.uk/~vgg/data/pets/)
-- [TF Core image segmentation tutorial (uses Oxford Pets + U-Net)](https://www.tensorflow.org/tutorials/images/segmentation)
+- [TF Core image segmentation tutorial (U-Net reference)](https://www.tensorflow.org/tutorials/images/segmentation)
+- [VocEd — applied DL for urothelial cytology segmentation](https://github.com/emilsar/VocEd)

@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { compatibleSkipSources } from '../lib/buildModel'
 
 const ACTIVATIONS = ['relu', 'sigmoid', 'tanh', 'elu', 'linear']
 
@@ -8,7 +9,12 @@ export default function ArchitectureEditor({ architecture, shapes, onChange, dis
   const update = (id, patch) =>
     onChange(architecture.map((l) => (l.id === id ? { ...l, ...patch } : l)))
 
-  const remove = (id) => onChange(architecture.filter((l) => l.id !== id))
+  const remove = (id) =>
+    onChange(
+      architecture
+        .filter((l) => l.id !== id)
+        .map((l) => (l.skipFromId === id ? { ...l, skipFromId: null } : l))
+    )
 
   const add = (type) => {
     const newLayer = newLayerForType(type, idCounter.current++)
@@ -33,35 +39,68 @@ export default function ArchitectureEditor({ architecture, shapes, onChange, dis
             <button className="danger" onClick={() => remove(layer.id)} disabled={disabled}>×</button>
           </div>
           <LayerParams layer={layer} update={(patch) => update(layer.id, patch)} disabled={disabled} />
+          {layer.type === 'conv2d' && (
+            <SkipPicker
+              architecture={architecture}
+              shapes={shapes}
+              targetIdx={i}
+              value={layer.skipFromId}
+              onChange={(skipFromId) => update(layer.id, { skipFromId })}
+              disabled={disabled}
+            />
+          )}
           <div className="shape">→ {fmt(shapes[i + 1])}</div>
         </div>
       ))}
 
       <div className="layer-card fixed">
         <div className="row">
-          <span className="name">Output: dense(10) softmax</span>
+          <span className="name">Output head (auto)</span>
         </div>
       </div>
 
       <div className="add-layer">
         <button onClick={() => add('conv2d')} disabled={disabled}>+ Conv2D</button>
+        <button onClick={() => add('conv2dTranspose')} disabled={disabled}>+ ConvT</button>
         <button onClick={() => add('maxPooling2d')} disabled={disabled}>+ MaxPool</button>
-        <button onClick={() => add('dense')} disabled={disabled}>+ Dense</button>
-        <button onClick={() => add('flatten')} disabled={disabled}>+ Flatten</button>
-        <button onClick={() => add('dropout')} disabled={disabled}>+ Dropout</button>
         <button onClick={() => add('avgPooling2d')} disabled={disabled}>+ AvgPool</button>
+        <button onClick={() => add('flatten')} disabled={disabled}>+ Flatten</button>
+        <button onClick={() => add('dense')} disabled={disabled}>+ Dense</button>
+        <button onClick={() => add('dropout')} disabled={disabled}>+ Dropout</button>
       </div>
     </>
   )
 }
 
+function SkipPicker({ architecture, shapes, targetIdx, value, onChange, disabled }) {
+  const sources = compatibleSkipSources(architecture, shapes, targetIdx)
+  return (
+    <div className="params skip-row">
+      <label>skip from</label>
+      <select
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value === '' ? null : +e.target.value)}
+        disabled={disabled || sources.length === 0}
+      >
+        <option value="">none</option>
+        {sources.map((s) => (
+          <option key={s.id} value={s.id}>
+            layer {s.idx + 1} [{s.shape.join('×')}]
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function layerLabel(l) {
   switch (l.type) {
-    case 'conv2d': return `Conv2D`
-    case 'maxPooling2d': return `MaxPool`
-    case 'avgPooling2d': return `AvgPool`
+    case 'conv2d': return 'Conv2D'
+    case 'conv2dTranspose': return 'ConvT'
+    case 'maxPooling2d': return 'MaxPool'
+    case 'avgPooling2d': return 'AvgPool'
     case 'flatten': return 'Flatten'
-    case 'dense': return `Dense`
+    case 'dense': return 'Dense'
     case 'dropout': return 'Dropout'
     default: return l.type
   }
@@ -78,6 +117,31 @@ function LayerParams({ layer, update, disabled }) {
           <label>kernel</label>
           <input type="number" min="1" max="7" value={layer.kernelSize}
             onChange={(e) => update({ kernelSize: +e.target.value })} disabled={disabled} />
+          <label>padding</label>
+          <select value={layer.padding || 'valid'}
+            onChange={(e) => update({ padding: e.target.value })} disabled={disabled}>
+            <option value="valid">valid</option>
+            <option value="same">same</option>
+          </select>
+          <label>activation</label>
+          <select value={layer.activation}
+            onChange={(e) => update({ activation: e.target.value })} disabled={disabled}>
+            {ACTIVATIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+      )
+    case 'conv2dTranspose':
+      return (
+        <div className="params">
+          <label>filters</label>
+          <input type="number" min="1" max="64" value={layer.filters}
+            onChange={(e) => update({ filters: +e.target.value })} disabled={disabled} />
+          <label>kernel</label>
+          <input type="number" min="1" max="7" value={layer.kernelSize}
+            onChange={(e) => update({ kernelSize: +e.target.value })} disabled={disabled} />
+          <label>strides</label>
+          <input type="number" min="1" max="4" value={layer.strides}
+            onChange={(e) => update({ strides: +e.target.value })} disabled={disabled} />
           <label>activation</label>
           <select value={layer.activation}
             onChange={(e) => update({ activation: e.target.value })} disabled={disabled}>
@@ -122,7 +186,8 @@ function LayerParams({ layer, update, disabled }) {
 
 function newLayerForType(type, id) {
   switch (type) {
-    case 'conv2d': return { id, type, filters: 16, kernelSize: 3, activation: 'relu' }
+    case 'conv2d': return { id, type, filters: 16, kernelSize: 3, activation: 'relu', padding: 'valid', skipFromId: null }
+    case 'conv2dTranspose': return { id, type, filters: 16, kernelSize: 3, strides: 2, activation: 'relu', padding: 'same' }
     case 'maxPooling2d': return { id, type, poolSize: 2 }
     case 'avgPooling2d': return { id, type, poolSize: 2 }
     case 'flatten': return { id, type }
